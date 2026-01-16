@@ -1,0 +1,5 @@
+# Meta-Llama-3-8B-Instruct configuration
+model_id: meta-llama/Meta-Llama-3-8B-Instruct
+cache_dir: /data/cat/ws/albu670g-qa-model/models
+dtype: float16
+device_map: auto

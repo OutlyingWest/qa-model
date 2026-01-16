@@ -1,0 +1,25 @@
+defaults:
+  - model: mistral_7b
+  - lora: default
+  - training: mcq
+  - inference: default
+  - _self_
+
+# Task type: mcq or saq
+task: mcq
+
+# Mode: train or infer
+mode: train
+
+# Paths configuration
+paths:
+  data_dir: ${hydra:runtime.cwd}/data
+  output_dir: ${hydra:runtime.cwd}/outputs
+  adapters_dir: ${hydra:runtime.cwd}/outputs/adapters
+
+# Hydra configuration
+hydra:
+  run:
+    dir: ${paths.output_dir}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: ${paths.output_dir}/multirun/${now:%Y-%m-%d_%H-%M-%S}

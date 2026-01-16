@@ -1,0 +1,5 @@
+# Mistral-7B-Instruct configuration
+model_id: mistralai/Mistral-7B-Instruct-v0.2
+cache_dir: /data/cat/ws/albu670g-qa-model/models
+dtype: float16
+device_map: auto

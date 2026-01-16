@@ -1,0 +1,15 @@
+# Default inference configuration
+max_new_tokens: 64
+do_sample: false
+temperature: 0.0
+top_p: 1.0
+
+# Stop token configuration
+use_stop_tokens: false
+stop_tokens:
+  - "<END>"
+
+# Validation and retry configuration
+validation:
+  enabled: true
+  max_retries: 2
