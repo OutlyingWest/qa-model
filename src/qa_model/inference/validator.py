@@ -4,7 +4,7 @@ import re
 from typing import Optional, Tuple
 
 # Regex patterns for parsing responses
-_SAQ_ANSWER_RE = re.compile(r"\banswer\s*:\s*(.+)", re.IGNORECASE)
+_SAQ_ANSWER_RE = re.compile(r"^\s*answer\s*:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 _MCQ_CHOICE_RE = re.compile(r"\b([A-D])\b")
 
 
@@ -57,25 +57,35 @@ def parse_mcq_response(text: str) -> str:
 
 
 def parse_saq_response(text: str) -> str:
-    """Extract a one-word SAQ answer from the model output.
+    """Extract a short (possibly multiword) SAQ answer from the model output.
 
     Args:
         text: Response text to parse.
 
     Returns:
-        Extracted answer word, or 'idk' as fallback.
+        Extracted answer string (1–6 tokens), or 'idk' as fallback.
     """
-    match = _SAQ_ANSWER_RE.search(text)
-    if match:
-        candidate = match.group(1).strip()
-    else:
-        candidate = text.strip()
+    match = _SAQ_ANSWER_RE.search(text or "")
+    candidate = match.group(1) if match else (text or "")
 
-    # Take the first token-ish segment; strip punctuation
-    candidate = re.split(r"\s+|/|,|\bor\b", candidate, maxsplit=1, flags=re.IGNORECASE)[0]
+    # Prefer the first line and drop any trailing sections if the model ignores the prompt.
+    candidate = candidate.splitlines()[0]
+    candidate = re.split(r"\bexplanation\s*:", candidate, maxsplit=1, flags=re.IGNORECASE)[0]
+
+    # Normalize whitespace and strip outer punctuation.
+    candidate = re.sub(r"\s+", " ", candidate.strip())
     candidate = candidate.strip().strip(".\"'`!?:;()[]{}<>")
+    candidate = re.sub(r"\s+", " ", candidate).strip().lower()
 
-    return candidate.lower() if candidate else "idk"
+    if not candidate:
+        return "idk"
+
+    # Enforce the multiword budget (matches the system prompt).
+    tokens = candidate.split()
+    if len(tokens) > 6:
+        candidate = " ".join(tokens[:6])
+
+    return candidate
 
 
 def get_format_error_message(task_type: str) -> str:
@@ -95,5 +105,5 @@ def get_format_error_message(task_type: str) -> str:
     else:
         return (
             "Your previous response did not follow the required format. "
-            "Please respond in the format: Answer: <your answer>. Explanation: <explanation>"
+            "Please respond in exactly one line: Answer: <your answer>"
         )

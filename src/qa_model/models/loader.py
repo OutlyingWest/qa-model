@@ -24,6 +24,7 @@ def load_base_model(
     cache_dir: Optional[str] = None,
     dtype: str = "float16",
     device_map: str = "auto",
+    max_memory: Optional[Union[str, dict]] = None,
 ) -> ModelBundle:
     """Load a base model and tokenizer.
 
@@ -32,6 +33,7 @@ def load_base_model(
         cache_dir: Directory to cache model files.
         dtype: Data type for model weights ('float16', 'bfloat16', 'float32').
         device_map: Device mapping strategy (default: 'auto').
+        max_memory: Max memory per device (e.g., "20GiB" or {0: "20GiB", "cpu": "30GiB"}).
 
     Returns:
         ModelBundle containing model and tokenizer.
@@ -53,11 +55,20 @@ def load_base_model(
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # Build max_memory dict if string provided (single GPU case)
+    max_memory_dict = None
+    if max_memory is not None:
+        if isinstance(max_memory, str):
+            max_memory_dict = {0: max_memory}
+        else:
+            max_memory_dict = max_memory
+
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         cache_dir=cache_dir,
         torch_dtype=torch_dtype,
         device_map=device_map,
+        max_memory=max_memory_dict,
         low_cpu_mem_usage=True,
     )
 
