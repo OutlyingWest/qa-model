@@ -4,6 +4,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 import hydra
 import pandas as pd
@@ -23,6 +24,7 @@ def run_mcq_inference(
     tokenizer,
     df: pd.DataFrame,
     cfg: DictConfig,
+    retry_log_path: Optional[Path] = None,
 ) -> pd.DataFrame:
     """Run inference on MCQ dataset.
 
@@ -45,6 +47,7 @@ def run_mcq_inference(
             tokenizer=tokenizer,
             prompt=prompt,
             task_type="mcq",
+            task_input=prompt_text,
             max_new_tokens=inference_cfg.max_new_tokens,
             do_sample=inference_cfg.do_sample,
             temperature=inference_cfg.temperature,
@@ -52,6 +55,8 @@ def run_mcq_inference(
             stop_tokens=list(inference_cfg.stop_tokens) if inference_cfg.stop_tokens else None,
             max_retries=inference_cfg.validation.max_retries,
             validation_enabled=inference_cfg.validation.enabled,
+            log_retries=getattr(inference_cfg.validation, "log_retries", False),
+            retry_log_path=retry_log_path,
         )
         choices.append(choice)
 
@@ -68,6 +73,7 @@ def run_saq_inference(
     tokenizer,
     df: pd.DataFrame,
     cfg: DictConfig,
+    retry_log_path: Optional[Path] = None,
 ) -> pd.DataFrame:
     """Run inference on SAQ dataset.
 
@@ -90,6 +96,7 @@ def run_saq_inference(
             tokenizer=tokenizer,
             prompt=prompt,
             task_type="saq",
+            task_input=question,
             max_new_tokens=inference_cfg.max_new_tokens,
             do_sample=inference_cfg.do_sample,
             temperature=inference_cfg.temperature,
@@ -97,6 +104,8 @@ def run_saq_inference(
             stop_tokens=list(inference_cfg.stop_tokens) if inference_cfg.stop_tokens else None,
             max_retries=inference_cfg.validation.max_retries,
             validation_enabled=inference_cfg.validation.enabled,
+            log_retries=getattr(inference_cfg.validation, "log_retries", False),
+            retry_log_path=retry_log_path,
         )
         answers.append(answer)
 
@@ -119,6 +128,10 @@ def main(cfg: DictConfig) -> None:
     data_dir = Path(cfg.paths.data_dir)
     adapters_dir = Path(cfg.paths.adapters_dir)
     output_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+    retry_log_path = None
+    if cfg.inference.validation.enabled and getattr(cfg.inference.validation, "log_retries", False):
+        retry_log_file = getattr(cfg.inference.validation, "retry_log_file", "retry.log")
+        retry_log_path = output_dir / retry_log_file
 
     task = cfg.task
     print(f"\nTask: {task}")
@@ -165,9 +178,9 @@ def main(cfg: DictConfig) -> None:
     # Run inference
     print("\n[4/4] Running inference...")
     if task == "mcq":
-        result_df = run_mcq_inference(model, bundle.tokenizer, df, cfg)
+        result_df = run_mcq_inference(model, bundle.tokenizer, df, cfg, retry_log_path=retry_log_path)
     else:
-        result_df = run_saq_inference(model, bundle.tokenizer, df, cfg)
+        result_df = run_saq_inference(model, bundle.tokenizer, df, cfg, retry_log_path=retry_log_path)
 
     # Save results
     output_file = output_dir / f"{task}_prediction.tsv"

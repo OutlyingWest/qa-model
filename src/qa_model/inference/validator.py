@@ -7,6 +7,38 @@ from typing import Optional, Tuple
 _SAQ_ANSWER_RE = re.compile(r"^\s*answer\s*:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 _MCQ_CHOICE_RE = re.compile(r"\b([A-D])\b")
 
+_HHMM_RE = re.compile(r"^\d{2}:\d{2}$")
+_INT_RE = re.compile(r"^\d+$")
+_NUMBER_RE = re.compile(r"^\d+(?:\.\d+)?$")
+_MONTH_1_12_RE = re.compile(r"^(?:1[0-2]|[1-9])$")
+_RANGE_0_24_RE = re.compile(r"^(?:[0-9]|1[0-9]|2[0-4])$")
+_RANGE_0_7_RE = re.compile(r"^(?:[0-7])$")
+
+
+def _extract_saq_format_regex(question: str) -> Tuple[Optional[re.Pattern], Optional[str]]:
+    """Infer an expected output regex from common dataset-style instructions."""
+    q = (question or "").lower()
+
+    if "hh:mm format" in q:
+        return _HHMM_RE, r"^\d{2}:\d{2}$"
+
+    if "1~12" in q:
+        return _MONTH_1_12_RE, r"^(1[0-2]|[1-9])$"
+
+    if "0~24" in q:
+        return _RANGE_0_24_RE, r"^([0-9]|1[0-9]|2[0-4])$"
+
+    if "0~7" in q:
+        return _RANGE_0_7_RE, r"^[0-7]$"
+
+    if "arabic numerals" in q:
+        # Some questions explicitly allow a decimal point.
+        if "decimal point" in q:
+            return _NUMBER_RE, r"^\d+(\.\d+)?$"
+        return _INT_RE, r"^\d+$"
+
+    return None, None
+
 
 def validate_mcq_response(text: str) -> bool:
     """Validate that a response contains a valid MCQ choice (A-D).
@@ -21,23 +53,41 @@ def validate_mcq_response(text: str) -> bool:
     return match is not None
 
 
-def validate_saq_response(text: str) -> bool:
+def validate_saq_response(text: str, question: Optional[str] = None) -> bool:
     """Validate that a response contains a valid SAQ answer format.
 
     Args:
         text: Response text to validate.
+        question: Optional question text to enforce format constraints.
 
     Returns:
         True if valid SAQ response, False otherwise.
     """
-    # Check for "Answer:" pattern
-    match = _SAQ_ANSWER_RE.search(text)
-    if match:
-        answer = match.group(1).strip()
-        # Ensure there's actually some content after "Answer:"
-        return len(answer) > 0
-    # Also accept direct answers without the "Answer:" prefix
-    return len(text.strip()) > 0
+    if not text or not text.strip():
+        return False
+
+    # Enforce single-line output (the prompt requires this).
+    non_empty_lines = [line for line in (text or "").splitlines() if line.strip()]
+    if len(non_empty_lines) != 1:
+        return False
+
+    # Require "Answer:" prefix to avoid accidental extra text getting parsed.
+    if not _SAQ_ANSWER_RE.search(non_empty_lines[0]):
+        return False
+
+    parsed = parse_saq_response(non_empty_lines[0])
+    if not parsed:
+        return False
+
+    # "idk" is always acceptable as an explicit unknown.
+    if parsed == "idk":
+        return True
+
+    expected_re, _expected_re_str = _extract_saq_format_regex(question or "")
+    if expected_re is None:
+        return True
+
+    return expected_re.fullmatch(parsed) is not None
 
 
 def parse_mcq_response(text: str) -> str:
@@ -107,3 +157,11 @@ def get_format_error_message(task_type: str) -> str:
             "Your previous response did not follow the required format. "
             "Please respond in exactly one line: Answer: <your answer>"
         )
+
+
+def get_saq_format_requirement(question: str) -> Optional[str]:
+    """Return a human-readable regex requirement string for retries, if any."""
+    _expected_re, expected_re_str = _extract_saq_format_regex(question or "")
+    if expected_re_str:
+        return f"Output must match regex: {expected_re_str}"
+    return None
