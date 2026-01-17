@@ -1,0 +1,6 @@
+# MLflow tracking configuration
+enabled: true
+tracking_uri: "file:/data/cat/ws/albu670g-qa-model/mlruns"  # Local storage
+experiment_name: "qa-lora-finetuning"
+log_model: false  # Don't save adapters to artifacts
+log_system_metrics: true

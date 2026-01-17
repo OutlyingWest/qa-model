@@ -1,11 +1,11 @@
 """Training utilities for LoRA fine-tuning."""
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Callable, List
 
 from datasets import Dataset
 from peft import PeftModel
-from transformers import TrainingArguments, PreTrainedTokenizer
+from transformers import TrainingArguments, PreTrainedTokenizer, TrainerCallback
 from trl import SFTTrainer, SFTConfig
 
 
@@ -23,6 +23,7 @@ def create_training_args(
     save_total_limit: int = 2,
     fp16: bool = True,
     bf16: bool = False,
+    mlflow_enabled: bool = False,
 ) -> SFTConfig:
     """Create training arguments for SFT.
 
@@ -40,10 +41,12 @@ def create_training_args(
         save_total_limit: Maximum checkpoints to keep.
         fp16: Use FP16 mixed precision.
         bf16: Use BF16 mixed precision.
+        mlflow_enabled: Enable MLflow tracking.
 
     Returns:
         SFTConfig object.
     """
+    report_to = "mlflow" if mlflow_enabled else "none"
     return SFTConfig(
         output_dir=str(output_dir),
         num_train_epochs=epochs,
@@ -61,7 +64,7 @@ def create_training_args(
         fp16=fp16,
         bf16=bf16,
         remove_unused_columns=False,
-        report_to="none",
+        report_to=report_to,
         gradient_checkpointing=True,
         optim="adamw_torch",
     )
@@ -73,7 +76,7 @@ def train_adapter(
     train_dataset: Dataset,
     val_dataset: Optional[Dataset],
     training_args: SFTConfig,
-    max_seq_length: int = 512,
+    callbacks: Optional[List[TrainerCallback]] = None,
 ) -> SFTTrainer:
     """Train a LoRA adapter using SFT.
 
@@ -82,19 +85,19 @@ def train_adapter(
         tokenizer: Tokenizer for the model.
         train_dataset: Training dataset with 'text' column.
         val_dataset: Optional validation dataset.
-        training_args: Training configuration.
-        max_seq_length: Maximum sequence length.
+        training_args: Training configuration (includes max_seq_length).
+        callbacks: Optional list of trainer callbacks.
 
     Returns:
         Trained SFTTrainer object.
     """
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         args=training_args,
-        max_seq_length=max_seq_length,
+        callbacks=callbacks,
     )
 
     trainer.train()

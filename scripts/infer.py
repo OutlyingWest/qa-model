@@ -165,7 +165,7 @@ def main(cfg: DictConfig) -> None:
         result_df = run_saq_inference(model, bundle.tokenizer, df, cfg)
 
     # Save results
-    output_file = output_dir / f"{task}_submission.tsv"
+    output_file = output_dir / f"{task}_prediction.tsv"
     result_df.to_csv(output_file, sep="\t", index=False)
 
     # Cleanup
