@@ -8,3 +8,4 @@ target_modules:
   - k_proj
   - v_proj
   - o_proj
+#  - gate_proj
