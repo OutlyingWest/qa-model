@@ -3,3 +3,7 @@ model_id: mistralai/Mistral-7B-Instruct-v0.2
 cache_dir: /data/cat/ws/albu670g-qa-model/models
 dtype: float16
 device_map: auto
+
+# GPU memory allocation (optional)
+# Example: "20GiB" or null to use default (90%)
+max_memory: null

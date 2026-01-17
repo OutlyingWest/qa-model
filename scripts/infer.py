@@ -131,18 +131,23 @@ def main(cfg: DictConfig) -> None:
         cache_dir=cfg.model.cache_dir,
         dtype=cfg.model.dtype,
         device_map=cfg.model.device_map,
+        max_memory=cfg.model.get("max_memory"),
     )
     print(f"Model loaded: {bundle.model_id}")
 
-    # Load adapter
+    # Load adapter (if enabled)
     print("\n[2/4] Loading adapter...")
-    adapter_path = select_adapter(task, adapters_dir)
-    if not adapter_path.exists():
-        print(f"WARNING: Adapter not found at {adapter_path}. Running without adapter.")
+    if not cfg.lora.enabled:
+        print("LoRA adapters disabled (lora.enabled=false). Using base model.")
         model = bundle.model
     else:
-        model = load_adapter(bundle.model, adapter_path)
-        print(f"Adapter loaded from: {adapter_path}")
+        adapter_path = select_adapter(task, adapters_dir)
+        if not adapter_path.exists():
+            print(f"WARNING: Adapter not found at {adapter_path}. Running without adapter.")
+            model = bundle.model
+        else:
+            model = load_adapter(bundle.model, adapter_path)
+            print(f"Adapter loaded from: {adapter_path}")
 
     model.eval()
 

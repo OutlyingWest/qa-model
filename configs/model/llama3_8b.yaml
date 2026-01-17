@@ -3,3 +3,7 @@ model_id: meta-llama/Meta-Llama-3-8B-Instruct
 cache_dir: /data/cat/ws/albu670g-qa-model/models
 dtype: float16
 device_map: auto
+
+# GPU memory allocation (optional)
+# Example: "20GiB" or null to use default (90%)
+max_memory: null

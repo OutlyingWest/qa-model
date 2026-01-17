@@ -85,6 +85,7 @@ def main(cfg: DictConfig) -> None:
         cache_dir=cfg.model.cache_dir,
         dtype=cfg.model.dtype,
         device_map=cfg.model.device_map,
+        max_memory=cfg.model.get("max_memory"),
     )
     print(f"Model loaded: {bundle.model_id}")
 

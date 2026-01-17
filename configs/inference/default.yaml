@@ -1,5 +1,5 @@
 # Default inference configuration
-max_new_tokens: 64
+max_new_tokens: 16
 do_sample: false
 temperature: 0.0
 top_p: 1.0

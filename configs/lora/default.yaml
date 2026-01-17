@@ -1,4 +1,5 @@
 # Default LoRA configuration
+enabled: true  # Set to false to disable LoRA adapters on inference
 r: 16
 alpha: 32
 dropout: 0.05
