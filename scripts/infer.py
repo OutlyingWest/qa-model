@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Inference script for LoRA-adapted models."""
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -16,6 +17,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from qa_model.models import load_base_model, load_adapter, unload_model
 from qa_model.inference import generate_with_retry, select_adapter
+from qa_model.inference.router import predict_mcq_choice
+from qa_model.inference.mcq_scorer import CountryPriorReranker
 from qa_model.prompts import build_mcq_prompt, build_saq_prompt
 
 
@@ -40,19 +43,56 @@ def run_mcq_inference(
     choices = []
     inference_cfg = cfg.inference
 
-    for prompt_text in tqdm(df["prompt"].tolist(), desc="MCQ Inference"):
+    mcq_mode = getattr(inference_cfg, "mcq_mode", "generate")
+    mcq_logprob_variants = None
+    if getattr(inference_cfg, "mcq_logprob", None) is not None and getattr(inference_cfg.mcq_logprob, "variants", None):
+        mcq_logprob_variants = list(inference_cfg.mcq_logprob.variants)
+
+    reranker = None
+    rerank_weight = 0.0
+    rerank_cfg = getattr(inference_cfg, "mcq_rerank", None)
+    if rerank_cfg is not None and bool(getattr(rerank_cfg, "enabled", False)):
+        rerank_weight = float(getattr(rerank_cfg, "weight", 0.0) or 0.0)
+        alpha = float(getattr(rerank_cfg, "alpha", 1.0) or 1.0)
+        train_csv = getattr(rerank_cfg, "train_csv", None) or getattr(rerank_cfg, "train_path", None)
+        if train_csv is None:
+            train_csv = str(Path(cfg.paths.data_dir) / "train_dataset_mcq.csv")
+        train_csv_path = Path(train_csv)
+        if rerank_weight and train_csv_path.exists():
+            reranker = CountryPriorReranker.from_train_csv(train_csv_path, alpha=alpha)
+
+    stop_tokens = list(inference_cfg.stop_tokens) if inference_cfg.stop_tokens else None
+    top_p = float(getattr(inference_cfg, "top_p", 1.0) or 1.0)
+
+    for row in tqdm(df.itertuples(index=False), desc="MCQ Inference"):
+        prompt_text = getattr(row, "prompt")
         prompt = build_mcq_prompt(tokenizer, prompt_text)
-        choice = generate_with_retry(
+
+        mcq_choices = None
+        mcq_country = getattr(row, "country", None)
+        if reranker is not None:
+            try:
+                mcq_choices = json.loads(getattr(row, "choices"))
+            except Exception:
+                mcq_choices = None
+
+        choice = predict_mcq_choice(
             model=model,
             tokenizer=tokenizer,
             prompt=prompt,
-            task_type="mcq",
             task_input=prompt_text,
+            mcq_mode=mcq_mode,
+            mcq_choices=mcq_choices,
+            mcq_country=mcq_country,
+            reranker=reranker,
+            rerank_weight=rerank_weight,
+            logprob_variants=mcq_logprob_variants,
             max_new_tokens=inference_cfg.max_new_tokens,
             do_sample=inference_cfg.do_sample,
             temperature=inference_cfg.temperature,
+            top_p=top_p,
             use_stop_tokens=inference_cfg.use_stop_tokens,
-            stop_tokens=list(inference_cfg.stop_tokens) if inference_cfg.stop_tokens else None,
+            stop_tokens=stop_tokens,
             max_retries=inference_cfg.validation.max_retries,
             validation_enabled=inference_cfg.validation.enabled,
             log_retries=getattr(inference_cfg.validation, "log_retries", False),
@@ -100,6 +140,7 @@ def run_saq_inference(
             max_new_tokens=inference_cfg.max_new_tokens,
             do_sample=inference_cfg.do_sample,
             temperature=inference_cfg.temperature,
+            top_p=float(getattr(inference_cfg, "top_p", 1.0) or 1.0),
             use_stop_tokens=inference_cfg.use_stop_tokens,
             stop_tokens=list(inference_cfg.stop_tokens) if inference_cfg.stop_tokens else None,
             max_retries=inference_cfg.validation.max_retries,

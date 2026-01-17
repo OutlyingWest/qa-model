@@ -15,3 +15,13 @@ validation:
   max_retries: 2
   log_retries: true
   retry_log_file: retry.log
+
+# Logprob
+mcq_mode: logprob
+mcq_logprob:
+  variants: [" {choice}", "\n{choice}", "{choice}"]
+mcq_rerank:
+  enabled: true
+  weight: 2.5
+  alpha: 1.0
+  train_csv: ${paths.data_dir}/train_dataset_mcq.csv

@@ -2,11 +2,12 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Callable, Dict, Optional, Sequence, Union
 
 from transformers import PreTrainedModel, PreTrainedTokenizer
 
 from .generator import generate_response
+from .mcq_scorer import MCQLogprobConfig, CountryPriorReranker, choose_mcq_via_logprob
 from .validator import (
     validate_mcq_response,
     validate_saq_response,
@@ -53,6 +54,7 @@ def generate_with_retry(
     max_new_tokens: int = 64,
     do_sample: bool = False,
     temperature: float = 0.0,
+    top_p: float = 1.0,
     use_stop_tokens: bool = False,
     stop_tokens: Optional[list] = None,
     max_retries: int = 2,
@@ -103,6 +105,7 @@ def generate_with_retry(
         max_new_tokens=max_new_tokens,
         do_sample=do_sample,
         temperature=temperature,
+        top_p=top_p,
         use_stop_tokens=use_stop_tokens,
         stop_tokens=stop_tokens,
     )
@@ -170,9 +173,72 @@ def generate_with_retry(
             max_new_tokens=max_new_tokens,
             do_sample=do_sample,
             temperature=temperature,
+            top_p=top_p,
             use_stop_tokens=use_stop_tokens,
             stop_tokens=stop_tokens,
         )
 
     # Return parsed result even if validation fails after all retries
     return parser(response)
+
+
+def predict_mcq_choice(
+    model: PreTrainedModel,
+    tokenizer: PreTrainedTokenizer,
+    *,
+    prompt: str,
+    task_input: Optional[str] = None,
+    mcq_mode: str = "generate",
+    mcq_choices: Optional[Dict[str, str]] = None,
+    mcq_country: Optional[str] = None,
+    reranker: Optional[CountryPriorReranker] = None,
+    rerank_weight: float = 0.0,
+    logprob_variants: Optional[Sequence[str]] = None,
+    # Generation settings (used when mcq_mode == 'generate')
+    max_new_tokens: int = 64,
+    do_sample: bool = False,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
+    use_stop_tokens: bool = False,
+    stop_tokens: Optional[list] = None,
+    max_retries: int = 2,
+    validation_enabled: bool = True,
+    log_retries: bool = False,
+    retry_log_path: Optional[Union[str, Path]] = None,
+) -> str:
+    """Predict a MCQ choice either via generation+parsing or via logprob scoring.
+
+    Default (`mcq_mode='generate'`) preserves the existing behavior.
+    """
+    if str(mcq_mode).lower() == "logprob":
+        cfg = MCQLogprobConfig(
+            variants=tuple(logprob_variants) if logprob_variants else MCQLogprobConfig().variants
+        )
+        return choose_mcq_via_logprob(
+            model=model,
+            tokenizer=tokenizer,
+            prompt=prompt,
+            logprob_cfg=cfg,
+            mcq_choices=mcq_choices,
+            target_country=mcq_country,
+            reranker=reranker,
+            rerank_weight=rerank_weight,
+        )
+
+    return generate_with_retry(
+        model=model,
+        tokenizer=tokenizer,
+        prompt=prompt,
+        task_type="mcq",
+        task_input=task_input,
+        max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        use_stop_tokens=use_stop_tokens,
+        stop_tokens=stop_tokens,
+        max_retries=max_retries,
+        validation_enabled=validation_enabled,
+        log_retries=log_retries,
+        retry_log_path=retry_log_path,
+    )

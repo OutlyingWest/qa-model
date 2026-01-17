@@ -103,6 +103,7 @@ def generate_response(
     max_new_tokens: int = 64,
     do_sample: bool = False,
     temperature: float = 0.0,
+    top_p: float = 1.0,
     use_stop_tokens: bool = False,
     stop_tokens: Optional[List[str]] = None,
 ) -> str:
@@ -115,6 +116,7 @@ def generate_response(
         max_new_tokens: Maximum tokens to generate.
         do_sample: Whether to use sampling.
         temperature: Sampling temperature.
+        top_p: Top-p (nucleus) sampling parameter (used only if do_sample=True).
         use_stop_tokens: Whether to use stop tokens.
         stop_tokens: List of stop token strings.
 
@@ -130,5 +132,6 @@ def generate_response(
         max_new_tokens=max_new_tokens,
         do_sample=do_sample,
         temperature=temperature,
+        top_p=top_p,
         stop_tokens=effective_stop_tokens,
     )
