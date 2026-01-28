@@ -12,6 +12,23 @@ from rank_bm25 import BM25Okapi
 class WikipediaIndex:
     """In-memory Wikipedia index with BM25 retrieval."""
 
+    # Common English stop words to filter out
+    STOP_WORDS = frozenset([
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "must", "shall", "can", "need", "dare",
+        "ought", "used", "to", "of", "in", "for", "on", "with", "at", "by",
+        "from", "as", "into", "through", "during", "before", "after", "above",
+        "below", "between", "under", "again", "further", "then", "once",
+        "here", "there", "when", "where", "why", "how", "all", "each", "few",
+        "more", "most", "other", "some", "such", "no", "nor", "not", "only",
+        "own", "same", "so", "than", "too", "very", "just", "also", "now",
+        "and", "but", "if", "or", "because", "until", "while", "although",
+        "this", "that", "these", "those", "what", "which", "who", "whom",
+        "whose", "it", "its", "he", "she", "they", "them", "his", "her",
+        "their", "i", "you", "we", "my", "your", "our", "me", "him", "us",
+    ])
+
     def __init__(
         self,
         documents: List[Dict[str, str]],
@@ -32,10 +49,11 @@ class WikipediaIndex:
     def __len__(self) -> int:
         return len(self.documents)
 
-    @staticmethod
-    def _tokenize(text: str) -> List[str]:
-        """Simple whitespace tokenization with lowercasing."""
-        return text.lower().split()
+    @classmethod
+    def _tokenize(cls, text: str) -> List[str]:
+        """Tokenize text with lowercasing and stop word removal."""
+        tokens = text.lower().split()
+        return [t for t in tokens if t not in cls.STOP_WORDS and len(t) > 1]
 
     @classmethod
     def from_corpus(
