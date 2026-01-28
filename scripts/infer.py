@@ -21,6 +21,7 @@ from qa_model.inference.router import predict_mcq_choice
 from qa_model.inference.mcq_scorer import CountryPriorReranker
 from qa_model.prompts import build_mcq_prompt, build_saq_prompt
 from qa_model.rag import create_retriever, RAGRetriever
+import json
 
 
 def run_mcq_inference(
@@ -109,6 +110,23 @@ def run_mcq_inference(
     return result
 
 
+def load_precomputed_contexts(contexts_file: Path) -> dict:
+    """Load pre-computed RAG contexts from JSONL file.
+
+    Args:
+        contexts_file: Path to JSONL file with contexts.
+
+    Returns:
+        Dict mapping question ID to context string.
+    """
+    contexts = {}
+    with open(contexts_file, "r", encoding="utf-8") as f:
+        for line in f:
+            record = json.loads(line.strip())
+            contexts[record["id"]] = record.get("context", "")
+    return contexts
+
+
 def run_saq_inference(
     model,
     tokenizer,
@@ -116,8 +134,11 @@ def run_saq_inference(
     cfg: DictConfig,
     retry_log_path: Optional[Path] = None,
     retriever: Optional[RAGRetriever] = None,
+    checkpoint_path: Optional[Path] = None,
+    checkpoint_every: int = 100,
+    precomputed_contexts: Optional[dict] = None,
 ) -> pd.DataFrame:
-    """Run inference on SAQ dataset.
+    """Run inference on SAQ dataset with checkpointing support.
 
     Args:
         model: The model with adapter.
@@ -126,20 +147,37 @@ def run_saq_inference(
         cfg: Inference configuration.
         retry_log_path: Optional path for retry logs.
         retriever: Optional RAG retriever for context augmentation.
+        checkpoint_path: Path to save/load checkpoints.
+        checkpoint_every: Save checkpoint every N questions.
+        precomputed_contexts: Dict of pre-computed contexts (ID -> context).
 
     Returns:
         DataFrame with predictions.
     """
-    answers = []
     inference_cfg = cfg.inference
 
     # RAG settings
     rag_cfg = cfg.get("rag", {})
-    rag_enabled = retriever is not None
+    use_precomputed = precomputed_contexts is not None
+    rag_enabled = retriever is not None or use_precomputed
     rag_top_k = int(rag_cfg.get("top_k", 3)) if rag_enabled else 0
     rag_max_tokens = int(rag_cfg.get("max_context_tokens", 512)) if rag_enabled else 0
 
-    for question in tqdm(df["en_question"].tolist(), desc="SAQ Inference"):
+    # Load checkpoint if exists
+    answers = []
+    start_idx = 0
+    if checkpoint_path and checkpoint_path.exists():
+        checkpoint_df = pd.read_csv(checkpoint_path, sep="\t")
+        answers = checkpoint_df["answer"].tolist()
+        start_idx = len(answers)
+        print(f"Resumed from checkpoint: {start_idx}/{len(df)} questions completed")
+
+    questions = df["en_question"].tolist()
+    ids = df["ID"].tolist()
+
+    for idx in tqdm(range(start_idx, len(questions)), desc="SAQ Inference", initial=start_idx, total=len(questions)):
+        question = questions[idx]
+
         # Retrieve context if RAG is enabled
         context = None
         if rag_enabled:
@@ -167,7 +205,18 @@ def run_saq_inference(
         )
         answers.append(answer)
 
-    return pd.DataFrame({"ID": df["ID"], "answer": answers})
+        # Save checkpoint
+        if checkpoint_path and (idx + 1) % checkpoint_every == 0:
+            checkpoint_df = pd.DataFrame({"ID": ids[:len(answers)], "answer": answers})
+            checkpoint_df.to_csv(checkpoint_path, sep="\t", index=False)
+            print(f"\nCheckpoint saved: {len(answers)}/{len(questions)}")
+
+    # Final save
+    if checkpoint_path:
+        checkpoint_df = pd.DataFrame({"ID": ids[:len(answers)], "answer": answers})
+        checkpoint_df.to_csv(checkpoint_path, sep="\t", index=False)
+
+    return pd.DataFrame({"ID": ids, "answer": answers})
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
@@ -261,6 +310,16 @@ def main(cfg: DictConfig) -> None:
     # Run inference
     step = "[5/5]" if task == "saq" else "[4/4]"
     print(f"\n{step} Running inference...")
+
+    # Checkpoint settings
+    checkpoint_cfg = cfg.inference.get("checkpoint", {})
+    checkpoint_enabled = bool(checkpoint_cfg.get("enabled", True))
+    checkpoint_every = int(checkpoint_cfg.get("every", 100))
+    checkpoint_path = output_dir / f"{task}_checkpoint.tsv" if checkpoint_enabled else None
+
+    if checkpoint_enabled:
+        print(f"Checkpointing enabled: saving every {checkpoint_every} questions to {checkpoint_path}")
+
     if task == "mcq":
         result_df = run_mcq_inference(model, bundle.tokenizer, df, cfg, retry_log_path=retry_log_path)
     else:
@@ -268,6 +327,8 @@ def main(cfg: DictConfig) -> None:
             model, bundle.tokenizer, df, cfg,
             retry_log_path=retry_log_path,
             retriever=retriever,
+            checkpoint_path=checkpoint_path,
+            checkpoint_every=checkpoint_every,
         )
 
     # Save results

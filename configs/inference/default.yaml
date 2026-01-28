@@ -16,6 +16,11 @@ validation:
   log_retries: true
   retry_log_file: retry.log
 
+# Checkpoint configuration (for long-running inference)
+checkpoint:
+  enabled: true
+  every: 100  # Save checkpoint every N questions
+
 # Logprob
 mcq_mode: logprob
 mcq_logprob:
