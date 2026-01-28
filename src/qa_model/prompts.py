@@ -38,9 +38,10 @@ Rules:
 - <ANSWER> can be 1–6 tokens (words/numbers/time).
 - No explanation, no second line, no trailing period.
 - Follow any requested numeric/time format exactly (HH:MM, Arabic numerals, 1~12, etc.).
-- Use the context to inform your answer, but answer directly without referencing the context.
+- Check the context and try to find the answer to your question in it. If you can't, use your general knowledge to answer the question. 
+- In any case answer directly without referencing the context.
 
-If the context doesn't help or you're unsure:
+If unsure:
 Answer: idk"""
 
 
