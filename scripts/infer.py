@@ -177,10 +177,15 @@ def run_saq_inference(
 
     for idx in tqdm(range(start_idx, len(questions)), desc="SAQ Inference", initial=start_idx, total=len(questions)):
         question = questions[idx]
+        question_id = ids[idx]
 
-        # Retrieve context if RAG is enabled
+        # Get context: precomputed or retrieve on-the-fly
         context = None
-        if rag_enabled:
+        if use_precomputed:
+            context = precomputed_contexts.get(question_id, "")
+            if not context:
+                context = None
+        elif retriever is not None:
             documents = retriever.retrieve(question, top_k=rag_top_k)
             if documents:
                 context = retriever.format_context(documents, max_tokens=rag_max_tokens)
@@ -271,24 +276,40 @@ def main(cfg: DictConfig) -> None:
 
     model.eval()
 
-    # Initialize RAG retriever (only for SAQ)
+    # Initialize RAG (only for SAQ)
     retriever = None
+    precomputed_contexts = None
     rag_cfg = cfg.get("rag", {})
+
     if task == "saq" and rag_cfg.get("enabled", False):
-        print("\n[3/5] Initializing RAG retriever...")
-        try:
-            retriever = create_retriever(rag_cfg)
-            if retriever:
-                print(f"RAG enabled: {rag_cfg.retriever.type} retriever initialized")
-                print(f"  - Index: {rag_cfg.index.dir}")
-                print(f"  - Top-k: {rag_cfg.top_k}")
-                print(f"  - Max context tokens: {rag_cfg.max_context_tokens}")
-        except FileNotFoundError as e:
-            print(f"WARNING: RAG corpus/index not found ({e}). Running without RAG.")
-            retriever = None
-        except Exception as e:
-            print(f"WARNING: Failed to initialize RAG ({e}). Running without RAG.")
-            retriever = None
+        print("\n[3/5] Initializing RAG...")
+
+        # Check for pre-computed contexts first (faster)
+        precomputed_path = rag_cfg.get("precomputed_contexts")
+        if precomputed_path:
+            precomputed_path = Path(precomputed_path)
+            if precomputed_path.exists():
+                print(f"Loading pre-computed contexts from {precomputed_path}...")
+                precomputed_contexts = load_precomputed_contexts(precomputed_path)
+                print(f"Loaded {len(precomputed_contexts)} pre-computed contexts")
+            else:
+                print(f"WARNING: Pre-computed contexts not found: {precomputed_path}")
+
+        # Fall back to on-the-fly retrieval if no precomputed contexts
+        if precomputed_contexts is None:
+            try:
+                retriever = create_retriever(rag_cfg)
+                if retriever:
+                    print(f"RAG enabled: {rag_cfg.retriever.type} retriever initialized")
+                    print(f"  - Index: {rag_cfg.index.dir}")
+                    print(f"  - Top-k: {rag_cfg.top_k}")
+                    print(f"  - Max context tokens: {rag_cfg.max_context_tokens}")
+            except FileNotFoundError as e:
+                print(f"WARNING: RAG corpus/index not found ({e}). Running without RAG.")
+                retriever = None
+            except Exception as e:
+                print(f"WARNING: Failed to initialize RAG ({e}). Running without RAG.")
+                retriever = None
     else:
         if task == "saq":
             print("\n[3/5] RAG disabled (rag.enabled=false)")
@@ -329,6 +350,7 @@ def main(cfg: DictConfig) -> None:
             retriever=retriever,
             checkpoint_path=checkpoint_path,
             checkpoint_every=checkpoint_every,
+            precomputed_contexts=precomputed_contexts,
         )
 
     # Save results

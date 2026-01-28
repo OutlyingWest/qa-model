@@ -19,7 +19,7 @@ validation:
 # Checkpoint configuration (for long-running inference)
 checkpoint:
   enabled: true
-  every: 100  # Save checkpoint every N questions
+  every: 15  # Save checkpoint every N questions
 
 # Logprob
 mcq_mode: logprob
