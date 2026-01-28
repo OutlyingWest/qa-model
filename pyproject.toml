@@ -21,7 +21,8 @@ dependencies = [
     "mlflow (>=2.15.0)",
     "evaluate (>=0.4.0)",
     "rouge-score (>=0.1.2)",
-    "sacrebleu (>=2.4.0)"
+    "sacrebleu (>=2.4.0)",
+    "rank-bm25 (>=0.2.0)"
 ]
 
 

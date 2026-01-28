@@ -4,6 +4,7 @@ defaults:
   - training: mcq
   - inference: default
   - mlflow: default
+  - rag: default
   - _self_
 
 # Task type: mcq or saq
@@ -17,6 +18,8 @@ paths:
   data_dir: ${hydra:runtime.cwd}/data
   output_dir: ${hydra:runtime.cwd}/outputs
   adapters_dir: ${hydra:runtime.cwd}/outputs/adapters
+  rag_dir: /data/cat/ws/albu670g-qa-model/rag/
+
 
 # Hydra configuration
 hydra:

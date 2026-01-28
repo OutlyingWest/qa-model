@@ -31,6 +31,18 @@ Rules:
 If unsure:
 Answer: idk"""
 
+SAQ_RAG_SYSTEM_PROMPT = """Use the provided context to answer the question in exactly this format (single line):
+Answer: <ANSWER>
+
+Rules:
+- <ANSWER> can be 1–6 tokens (words/numbers/time).
+- No explanation, no second line, no trailing period.
+- Follow any requested numeric/time format exactly (HH:MM, Arabic numerals, 1~12, etc.).
+- Use the context to inform your answer, but answer directly without referencing the context.
+
+If the context doesn't help or you're unsure:
+Answer: idk"""
+
 
 MCQ_SYSTEM_PROMPT = """Answer the multiple choice question.
 Pick only one option (A, B, C, or D) without explanation."""
@@ -60,8 +72,20 @@ def build_mcq_prompt(tokenizer, question: str) -> str:
     return build_prompt(tokenizer, MCQ_SYSTEM_PROMPT, question)
 
 
-def build_saq_prompt(tokenizer, question: str) -> str:
-    """Build a prompt for SAQ task."""
+def build_saq_prompt(tokenizer, question: str, context: str = None) -> str:
+    """Build a prompt for SAQ task.
+
+    Args:
+        tokenizer: The tokenizer with chat template.
+        question: The question to answer.
+        context: Optional RAG context to include.
+
+    Returns:
+        Formatted prompt string.
+    """
+    if context:
+        user_content = f"Context:\n{context}\n\nQuestion: {question}"
+        return build_prompt(tokenizer, SAQ_RAG_SYSTEM_PROMPT, user_content)
     return build_prompt(tokenizer, SAQ_SYSTEM_PROMPT, f"Question: {question}")
 
 

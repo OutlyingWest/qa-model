@@ -20,6 +20,7 @@ from qa_model.inference import generate_with_retry, select_adapter
 from qa_model.inference.router import predict_mcq_choice
 from qa_model.inference.mcq_scorer import CountryPriorReranker
 from qa_model.prompts import build_mcq_prompt, build_saq_prompt
+from qa_model.rag import create_retriever, RAGRetriever
 
 
 def run_mcq_inference(
@@ -114,6 +115,7 @@ def run_saq_inference(
     df: pd.DataFrame,
     cfg: DictConfig,
     retry_log_path: Optional[Path] = None,
+    retriever: Optional[RAGRetriever] = None,
 ) -> pd.DataFrame:
     """Run inference on SAQ dataset.
 
@@ -122,6 +124,8 @@ def run_saq_inference(
         tokenizer: The tokenizer.
         df: DataFrame with 'en_question' column.
         cfg: Inference configuration.
+        retry_log_path: Optional path for retry logs.
+        retriever: Optional RAG retriever for context augmentation.
 
     Returns:
         DataFrame with predictions.
@@ -129,8 +133,21 @@ def run_saq_inference(
     answers = []
     inference_cfg = cfg.inference
 
+    # RAG settings
+    rag_cfg = cfg.get("rag", {})
+    rag_enabled = retriever is not None
+    rag_top_k = int(rag_cfg.get("top_k", 3)) if rag_enabled else 0
+    rag_max_tokens = int(rag_cfg.get("max_context_tokens", 512)) if rag_enabled else 0
+
     for question in tqdm(df["en_question"].tolist(), desc="SAQ Inference"):
-        prompt = build_saq_prompt(tokenizer, question)
+        # Retrieve context if RAG is enabled
+        context = None
+        if rag_enabled:
+            documents = retriever.retrieve(question, top_k=rag_top_k)
+            if documents:
+                context = retriever.format_context(documents, max_tokens=rag_max_tokens)
+
+        prompt = build_saq_prompt(tokenizer, question, context=context)
         answer = generate_with_retry(
             model=model,
             tokenizer=tokenizer,
@@ -205,8 +222,33 @@ def main(cfg: DictConfig) -> None:
 
     model.eval()
 
+    # Initialize RAG retriever (only for SAQ)
+    retriever = None
+    rag_cfg = cfg.get("rag", {})
+    if task == "saq" and rag_cfg.get("enabled", False):
+        print("\n[3/5] Initializing RAG retriever...")
+        try:
+            retriever = create_retriever(rag_cfg)
+            if retriever:
+                print(f"RAG enabled: {rag_cfg.retriever.type} retriever initialized")
+                print(f"  - Index: {rag_cfg.index.dir}")
+                print(f"  - Top-k: {rag_cfg.top_k}")
+                print(f"  - Max context tokens: {rag_cfg.max_context_tokens}")
+        except FileNotFoundError as e:
+            print(f"WARNING: RAG corpus/index not found ({e}). Running without RAG.")
+            retriever = None
+        except Exception as e:
+            print(f"WARNING: Failed to initialize RAG ({e}). Running without RAG.")
+            retriever = None
+    else:
+        if task == "saq":
+            print("\n[3/5] RAG disabled (rag.enabled=false)")
+        else:
+            print("\n[3/5] RAG skipped (MCQ task)")
+
     # Load test data
-    print("\n[3/4] Loading test data...")
+    step = "[4/5]" if task == "saq" else "[3/4]"
+    print(f"\n{step} Loading test data...")
     if task == "mcq":
         test_file = data_dir / "test_dataset_mcq.csv"
         df = pd.read_csv(test_file)
@@ -217,11 +259,16 @@ def main(cfg: DictConfig) -> None:
         print(f"Loaded {len(df)} SAQ test samples")
 
     # Run inference
-    print("\n[4/4] Running inference...")
+    step = "[5/5]" if task == "saq" else "[4/4]"
+    print(f"\n{step} Running inference...")
     if task == "mcq":
         result_df = run_mcq_inference(model, bundle.tokenizer, df, cfg, retry_log_path=retry_log_path)
     else:
-        result_df = run_saq_inference(model, bundle.tokenizer, df, cfg, retry_log_path=retry_log_path)
+        result_df = run_saq_inference(
+            model, bundle.tokenizer, df, cfg,
+            retry_log_path=retry_log_path,
+            retriever=retriever,
+        )
 
     # Save results
     output_file = output_dir / f"{task}_prediction.tsv"

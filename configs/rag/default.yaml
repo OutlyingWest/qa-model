@@ -1,0 +1,30 @@
+# RAG (Retrieval-Augmented Generation) configuration
+# Only affects SAQ inference when enabled
+
+enabled: false
+
+# Knowledge source
+source: wikipedia
+
+# Retrieval settings
+top_k: 3
+max_context_tokens: 512
+
+# Cache settings
+cache:
+  enabled: true
+  dir: ${paths.rag_dir}/cache
+
+# Index settings
+index:
+  dir: ${paths.rag_dir}/wiki_index
+  corpus: ${paths.rag_dir}/wiki_corpus.jsonl
+
+# Retriever configuration
+retriever:
+  type: bm25  # Options: bm25 (dense retrieval can be added later)
+
+  # BM25-specific parameters
+  bm25:
+    k1: 1.5
+    b: 0.75
