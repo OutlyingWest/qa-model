@@ -165,19 +165,8 @@ def build_wikipedia_index(
     index_exists = documents_file.exists() and bm25_file.exists()
 
     if index_exists and not force_rebuild:
-        # Check if parameters match
-        if params_file.exists():
-            with open(params_file, "r", encoding="utf-8") as f:
-                saved_params = json.load(f)
-
-            # Compute corpus hash to detect changes
-            corpus_hash = _compute_file_hash(corpus_path)
-            if (
-                saved_params.get("k1") == k1
-                and saved_params.get("b") == b
-                and saved_params.get("corpus_hash") == corpus_hash
-            ):
-                return WikipediaIndex.load(index_dir)
+        # Index exists - load it (skip hash validation for speed)
+        return WikipediaIndex.load(index_dir)
 
     # Build new index
     index = WikipediaIndex.from_corpus(corpus_path, k1=k1, b=b)
@@ -192,17 +181,14 @@ def build_wikipedia_index(
 
 
 def _compute_file_hash(file_path: Path, block_size: int = 65536) -> str:
-    """Compute MD5 hash of a file.
+    """Compute MD5 hash of the first block of a file.
 
     Args:
         file_path: Path to file.
-        block_size: Read block size.
+        block_size: Size of first block to hash.
 
     Returns:
         Hex digest of file hash.
     """
-    hasher = hashlib.md5()
     with open(file_path, "rb") as f:
-        for block in iter(lambda: f.read(block_size), b""):
-            hasher.update(block)
-    return hasher.hexdigest()
+        return hashlib.md5(f.read(block_size)).hexdigest()
