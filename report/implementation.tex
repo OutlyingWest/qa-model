@@ -1,0 +1,18 @@
+\section{Implementation}
+This section will detail how the system is implemented and configured.
+
+\subsection{LoRA Fine-Tuning}
+I will describe which transformer layers are adapted, how adapters are
+trained, and which hyperparameters are used for MCQ and SAQ tasks.
+
+\subsection{MCQ Inference via Logprob Scoring}
+I will summarize the log-probability scoring algorithm used to pick among
+answer options and the reranking mechanism based on country priors.
+
+\subsection{RAG for SAQ}
+I will explain how retrieval augmentation is integrated, including indexing,
+retrieval, and prompt construction with contextual snippets.
+
+\subsection{Parsing and Validation}
+I will describe how answer formats are parsed, validated, and retried for
+robustness in both MCQ and SAQ settings.
