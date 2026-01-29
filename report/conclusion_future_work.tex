@@ -1,3 +1,15 @@
 \section{Conclusion and Future Work}
-This section summarizes the contributions and outlines concrete next steps for
-further model and retrieval improvements.
+I present a LoRA-based QA pipeline for MCQ and SAQ with strict format control,
+log-probability scoring for MCQ, and an optional BM25-based RAG component for
+SAQ. Across the iteration cycle, the largest SAQ gains come from prompt and
+parsing refinements, with a smaller contribution from expanding LoRA targets to
+include \texttt{gate\_proj}. For MCQ, logprob scoring with tuned weighting
+improves accuracy over the baseline. The best combined configuration reaches
+0.79 MCQ accuracy and 0.59 SAQ accuracy, while the current RAG implementation
+does not yield a measurable SAQ improvement.
+
+Future work should focus on (1) improving retrieval quality with better
+indexing, reranking, or learned retrievers; (2) analyzing generation errors to
+separate formatting failures from semantic mistakes; (3) expanding ablations on
+LoRA targets and hyperparameters; and (4) adding robust reporting of hardware
+and training-time metrics to improve reproducibility.
