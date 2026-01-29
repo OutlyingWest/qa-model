@@ -48,8 +48,7 @@ Provide proper references to:
 - Use the LaTeX template and report files in the `report/` directory as the **single source of truth** for formatting and structure.
 - In the folder `report/drafts` there are:
   - `report/drafts/experiments.md`
-  -
-  -
+  - `report/drafts/important_to_mention.md`
 
 - You must:
   - Keep the main focus on transferring the results from report/drafts/experiments.md (all numbers must be the same) 
