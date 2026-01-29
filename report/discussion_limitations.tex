@@ -1,3 +1,9 @@
 \section{Discussion and Limitations}
-I will discuss observed trends, limitations of the current pipeline, and
-possible sources of error or variance.
+The current pipeline is deliberately lightweight, which introduces several
+limitations. First, the evaluation focuses on accuracy and does not measure
+calibration or partial credit for near-miss answers. Second, the RAG index is
+fixed to a Wikipedia corpus and may contain noisy or outdated passages that
+conflict with the target distribution. Third, strict output formatting reduces
+noise but can also discard semantically correct responses that violate the
+schema. Finally, the experiments emphasize targeted changes rather than a
+full hyperparameter search, so some gains may be left unexplored.

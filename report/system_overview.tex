@@ -1,4 +1,17 @@
 \section{System Overview}
-This section will present the high-level architecture and data flow.
-Key components include dataset preprocessing, LoRA-based training,
-task-specific inference, and optional retrieval augmentation.
+The pipeline consists of four stages: data preparation, task-specific LoRA
+training, inference with validation, and evaluation. MCQ and SAQ datasets are
+loaded from CSV files, split into training and validation subsets, and
+tokenized with a task-specific prompt template. Two separate LoRA adapters are
+trained---one per task---to keep the output formats stable and the adapters
+lightweight.
+
+During inference, the system routes MCQ questions to a log-probability scorer
+and routes SAQ questions to a constrained generative path. Both modes share a
+validation layer that enforces the required output format and triggers limited
+retries when the response is invalid. For SAQ, retrieval augmentation can be
+enabled to insert a short context before answering.
+
+The evaluation reports accuracy overall and by country tag for MCQ/SAQ.
+Section~\ref{sec:experiments} details the iterative experiments, while
+Section~\ref{sec:results} consolidates the final scores.

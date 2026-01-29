@@ -89,11 +89,7 @@ Stop and let me check your suggestions before proceeding. Provide several option
 ### Step 3 — Add content for Outlined General Structure
 
 - Ask the user to review and confirm before proceeding to Step 4.
-  ```bash
-  /export codex-session.jsonl
-  git add codex-session.jsonl
-  git commit -m "Save Codex session context after Step <n>"
-    ```
+
   - Save the updated report files:
     ```bash
     git add report/
@@ -118,12 +114,7 @@ Stop and let me check your suggestions before proceeding. Provide several option
 - When finished:
   - Stop editing.
   - Summarize what experiments are reported and what conclusions can (and cannot) be drawn.
-  - Save the current interactive session context:
-    ```bash
-    /export codex-session.jsonl
-    git add codex-session.jsonl
-    git commit -m "Save Codex session context after Step 4"
-    ```
+
   - Save the updated report files:
     ```bash
     git add report/
@@ -143,12 +134,6 @@ Stop and let me check your suggestions before proceeding. Provide several option
 - When finished:
   - Stop editing completely.
   - Provide a final summary of the whole report structure and main messages.
-  - Save the current interactive session context:
-    ```bash
-    /export codex-session.jsonl
-    git add codex-session.jsonl
-    git commit -m "Save Codex session context after Step 5"
-    ```
   - Save the updated report files:
     ```bash
     git add report/
@@ -164,7 +149,6 @@ Stop and let me check your suggestions before proceeding. Provide several option
 - At every step:
   - Keep changes focused on the current step.
   - After completing each step, commit both:
-    - The Codex session context file (`codex-session.jsonl`);
     - The modified report files (`report/`).
   - Avoid large, unrelated refactors of the LaTeX template or project structure.
 - If instructions appear ambiguous:

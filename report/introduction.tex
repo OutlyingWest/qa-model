@@ -1,4 +1,18 @@
 \section{Introduction}
-I develop a QA pipeline that fine-tunes a base LLM with LoRA adapters and
-evaluates performance on MCQ and SAQ tasks. This section will motivate the
-task, define the evaluation setting, and summarize the main contributions.
+I develop a QA pipeline for multiple-choice (MCQ) and short-answer (SAQ) tasks
+that require concise, format-constrained responses. The system adapts a base
+LLM using parameter-efficient LoRA adapters \citep{Hu2021LoRA} and evaluates
+both selection-based and generative answering. I also explore retrieval
+augmentation for SAQ \citep{Lewis2020RAG}, aiming to improve factual recall
+without changing the base model.
+
+The report has three goals: (1) describe the end-to-end pipeline and
+implementation choices; (2) document iterative improvements grounded in the
+experiment logs; and (3) summarize final performance and limitations. The main
+contributions are:
+\begin{itemize}
+  \item a LoRA-based training setup tailored to MCQ and SAQ formatting;
+  \item a log-probability MCQ scorer with a lightweight country prior;
+  \item a BM25-based RAG module with optional preprocessing for SAQ;
+  \item an ablation-style evaluation of prompt, parsing, and retrieval variants.
+\end{itemize}

@@ -1,18 +1,44 @@
 \section{Implementation}
-This section will detail how the system is implemented and configured.
+The implementation builds on PyTorch and the Hugging Face Transformers stack
+\citep{Paszke2019PyTorch,Wolf2020Transformers}, with Hydra used for
+configuration management \citep{Yadan2019Hydra}. The codebase separates
+training and inference scripts for clarity and reproducibility.
 
 \subsection{LoRA Fine-Tuning}
-I will describe which transformer layers are adapted, how adapters are
-trained, and which hyperparameters are used for MCQ and SAQ tasks.
+I apply LoRA adapters \citep{Hu2021LoRA} to the attention projection layers
+(\texttt{q\_proj}, \texttt{k\_proj}, \texttt{v\_proj}, \texttt{o\_proj}) with
+rank $r=16$, $\alpha=32$, and dropout $0.05$. This keeps the number of trainable
+parameters small while allowing task-specific adaptation. For SAQ, I also test
+an extended configuration that includes \texttt{gate\_proj} to increase MLP
+capacity.
 
 \subsection{MCQ Inference via Logprob Scoring}
-I will summarize the log-probability scoring algorithm used to pick among
-answer options and the reranking mechanism based on country priors.
+Instead of generating a full answer, MCQ inference scores each option by the
+log-probability of producing a single-letter continuation. The algorithm
+performs a forward pass on the prompt to obtain the KV cache and the
+distribution for the next token. For each choice in \{A,B,C,D\}, I evaluate
+several textual variants (`` A'', ``\textbackslash nA'', ``A'') and sum
+token-level log-probabilities using the cached states. The best variant score
+is selected for that choice, and the highest-scoring choice is returned.
+
+I optionally add a lightweight country-aware prior derived from the MCQ
+training data. The prior is computed as a smoothed log-probability of the
+target country tag conditioned on the option text, and scaled by a tunable
+weight during inference.
 
 \subsection{RAG for SAQ}
-I will explain how retrieval augmentation is integrated, including indexing,
-retrieval, and prompt construction with contextual snippets.
+For SAQ, I integrate a retrieval-augmented generation path
+\citep{Lewis2020RAG}. The retriever builds a Wikipedia-based index using
+BM25 \citep{Robertson2009BM25} over tokenized document text. Tokenization
+lowercases, strips punctuation, removes stop words, and applies a lightweight
+Porter stemmer \citep{Porter1980}. At inference time, the top-$k$ passages are
+inserted into a dedicated RAG prompt template. Contexts can also be
+precomputed and loaded from disk to avoid on-the-fly retrieval.
 
 \subsection{Parsing and Validation}
-I will describe how answer formats are parsed, validated, and retried for
-robustness in both MCQ and SAQ settings.
+The system enforces strict answer formats to stabilize evaluation. SAQ answers
+must follow a single-line ``Answer: <ANSWER>'' template with 1--6 tokens, while
+MCQ responses must include exactly one of \{A,B,C,D\}. For SAQ, additional
+regex checks enforce dataset-specific formats (e.g., \texttt{HH:MM} or bounded
+integer ranges). When validation fails, the model is prompted to retry up to a
+small fixed number of times, and the final response is parsed deterministically.

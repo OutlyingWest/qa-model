@@ -1,19 +1,29 @@
 \section{Experiments and Iterative Improvements}
-This section will report incremental changes and their impact, organized around
-the experimental records in \texttt{report/drafts/experiments.md} and linked to
-corresponding submissions and commits.
+\label{sec:experiments}
+This section summarizes the iterative changes evaluated during development.
+The ordering follows \texttt{report/drafts/experiments.md}, and each entry
+corresponds to a submission and related code changes. I report quantitative
+results in Section~\ref{sec:results}; here I focus on the intent and design
+of each modification.
 
 \subsection{Baseline}
-I will document the default model performance for MCQ and SAQ as the baseline.
+The baseline uses LoRA adapters on attention projections, standard task
+prompts, and format validation with limited retries. MCQ uses log-probability
+scoring, while SAQ uses constrained generation with a strict ``Answer:''
+prefix.
 
 \subsection{SAQ Iterations}
-I will outline prompt and parsing refinements, validation retries, and LoRA
-layer extensions for SAQ improvements.
+I evaluate three categories of changes for SAQ: prompt/format refinements,
+validation retries, and expanded LoRA target layers. These are designed to
+reduce parsing errors, support multiword answers, and increase adapter
+capacity without full fine-tuning.
 
 \subsection{MCQ Iterations}
-I will outline logprob scoring variants and reranking configurations tested for
-MCQ improvements.
+For MCQ, I test logprob variants and reranking weights. The goal is to
+stabilize single-letter selection and leverage country priors derived from the
+training set when options are ambiguous.
 
 \subsection{RAG Variants}
-I will summarize retrieval settings (raw, stop-word removal, stemming) and the
-observed effects on SAQ performance.
+RAG experiments compare raw retrieval, stop-word filtering, and stemming
+configurations. I also analyze a later RAG training run and the resulting
+inference behavior to assess whether retrieval helps SAQ accuracy.
