@@ -6,6 +6,37 @@ tokenized with a task-specific prompt template. Two separate LoRA adapters are
 trained---one per task---to keep the output formats stable and the adapters
 lightweight.
 
+\subsection{Datasets and Splits}
+Table~\ref{tab:dataset} summarizes the task-specific data. Country tags are
+reported using ISO-style codes; MCQ values labelled ``UK'' are mapped to
+``GB'' for consistency. Validation splits are drawn at random with
+val\_ratio 0.15 (MCQ) and 0.20 (SAQ). No fixed seed was set for the
+split, so exact train/val membership may differ across runs.
+
+\begin{table}[t]
+  \centering
+  \small
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{lrrrrr}
+    \hline
+    Split & Total & CN & US & IR & GB \\
+    \hline
+    MCQ train & 836 & 219 & 214 & 206 & 197 \\
+    MCQ test  & 419 & 116 & 96  & 100 & 107 \\
+    SAQ train & 1333 & 339 & 340 & 323 & 331 \\
+    SAQ test  & 667 & 161 & 160 & 177 & 169 \\
+    \hline
+  \end{tabular}}
+  \caption{Dataset card by task, split, and country counts}
+  \label{tab:dataset}
+\end{table}
+
+SAQ questions include crowdsourced annotations: on average 3.95 distinct
+answers with 6.4 total votes per question; the \texttt{idks} field records
+\textit{idk} (708), \textit{no-answer} (415), and \textit{not-applicable} (313)
+flags in the training set. These signals are retained as-is and contribute to
+label noise discussed later.
+
 During inference, the system routes MCQ questions to a log-probability scorer
 and routes SAQ questions to a constrained generative path. Both modes share a
 validation layer that enforces the required output format and triggers limited

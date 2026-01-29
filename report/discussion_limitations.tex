@@ -3,7 +3,12 @@ The current pipeline is deliberately lightweight, which introduces several
 limitations. First, the evaluation focuses on accuracy and does not measure
 calibration or partial credit for near-miss answers. Second, the RAG index is
 fixed to a Wikipedia corpus and may contain noisy or outdated passages that
-conflict with the target distribution. Third, strict output formatting reduces
-noise but can also discard semantically correct responses that violate the
-schema. Finally, the experiments emphasize targeted changes rather than a
-full hyperparameter search, so some gains may be left unexplored.
+conflict with the target distribution. Third, strict output formatting
+reduces noise but can also discard semantically correct responses that violate
+the schema. Fourth, SAQ annotations include substantial noise
+(\texttt{idks}: 708 \textit{idk}, 415 \textit{no-answer}, 313
+\textit{not-applicable} in train), which likely caps achievable accuracy and is
+not explicitly modeled. Finally, train/val splits are random without a fixed
+seed and the experiments emphasize targeted changes rather than a full
+hyperparameter search, so some gains may be left unexplored and replicability
+across runs may vary slightly.

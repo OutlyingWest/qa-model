@@ -4,6 +4,14 @@ The implementation builds on PyTorch and the Hugging Face Transformers stack
 configuration management \citep{Yadan2019Hydra}. The codebase separates
 training and inference scripts for clarity and reproducibility.
 
+\paragraph{Model choice.}
+All reported experiments use \textbf{LLaMA-3B-Instruct}. Early trials with the
+base (non-instruct) LLaMA-3B produced very low accuracy and did not benefit
+meaningfully from LoRA; because the goal was to study parameter-efficient
+fine-tuning in a realistic setting, we switched to the instruct variant to
+start from a model aligned to task directives. Config files allow other models,
+but the results in this report are from the 3B Instruct backbone.
+
 \subsection{LoRA Fine-Tuning}
 LoRA adapters \citep{Hu2021LoRA} are applied to the attention projection layers
 (\texttt{q\_proj}, \texttt{k\_proj}, \texttt{v\_proj}, \texttt{o\_proj}) with
@@ -22,19 +30,32 @@ token-level log-probabilities are summed using the cached states. The best
 variant score is selected for that choice, and the highest-scoring choice is
 returned.
 
-An optional lightweight country-aware prior is added derived from the MCQ
-training data. The prior is computed as a smoothed log-probability of the
-target country tag conditioned on the option text, and scaled by a tunable
-weight during inference.
+An optional country-aware reranking bonus is computed from
+\texttt{train\_dataset\_mcq.csv} with Laplace smoothing $\alpha{=}1$ over
+normalized option texts and country tags. The final score for choice $c$ is:
+\begin{equation}
+\begin{aligned}
+s(c) &= \log P(c \mid \text{prompt}) \\
+&\quad + w\bigl(\log P_{\text{prior}}(c \mid \text{country})
+ - \log P_{\text{uniform}}\bigr),
+\end{aligned}
+\end{equation}
+where $w$ is the rerank weight and the uniform term centers scores across
+countries. A sweep over $w\in\{1.0,1.4,2.0,2.5\}$ favored $w{=}2.5$, which is
+used in the shipped inference config to slightly strengthen country-consistent
+ties while keeping overall accuracy stable.
 
 \subsection{RAG for SAQ}
 For SAQ, a retrieval-augmented generation path is integrated
 \citep{Lewis2020RAG}. The retriever builds a Wikipedia-based index using
-BM25 \citep{Robertson2009BM25} over tokenized document text. Tokenization
-lowercases, strips punctuation, removes stop words, and applies a lightweight
-Porter stemmer \citep{Porter1980}. At inference time, the top-$k$ passages are
+BM25 \citep{Robertson2009BM25} with $k_1{=}1.5$, $b{=}0.75$ over tokenized
+document text. Tokenization lowercases, removes punctuation, filters English
+stop words, and applies a lightweight Porter stemmer \citep{Porter1980}. At
+inference time the top-$k{=}3$ passages (up to 512 tokens of context) are
 inserted into a dedicated RAG prompt template. Contexts can also be
-precomputed and loaded from disk to avoid on-the-fly retrieval.
+precomputed and loaded from disk to avoid on-the-fly retrieval. Corpus and
+index live under \texttt{rag\_dir} (configurable); corpus size statistics were
+not logged, which limits visibility into coverage and retrieval quality.
 
 \subsection{Parsing and Validation}
 The system enforces strict answer formats to stabilize evaluation. SAQ answers

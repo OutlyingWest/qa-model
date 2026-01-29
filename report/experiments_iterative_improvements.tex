@@ -1,13 +1,13 @@
 \section{Experiments and Iterative Improvements}
 \label{sec:experiments}
 This section summarizes the iterative changes evaluated during development.
-The ordering follows \texttt{report/drafts/experiments.md}, and each entry
-corresponds to a submission and related code changes. I report quantitative
-results in Section~\ref{sec:results}; here I focus on the intent and design
-of each modification.
+The ordering follows the experiment log, and each entry corresponds to a
+submission and related code changes. Quantitative results are reported in
+Section~\ref{sec:results}; this section focuses on the intent and design of
+each modification.
 
 \subsection{Experimental Setup}
-I train separate LoRA adapters for MCQ and SAQ using the project Hydra
+Separate LoRA adapters were trained for MCQ and SAQ using the project Hydra
 configuration. Unless otherwise stated, LoRA uses $r=16$, $\alpha=32$, dropout
 0.05, and targets attention projections only. MCQ training uses 3 epochs, batch
 size 4, gradient accumulation 4, learning rate $1\times10^{-4}$, and a cosine
@@ -16,34 +16,34 @@ learning rate $1\times10^{-5}$, and a constant scheduler. Inference is
 deterministic (temperature 0) with a maximum of 16 generated tokens and up to
 two validation retries.
 
-Metrics are accuracy overall and by country (China, Iran, UK, US) for both
-tasks. All runs were executed on a single NVIDIA H100 GPU (95,830 MiB),
-driver 580.65.06, CUDA 13.0.
+Metrics are accuracy overall and by country (CN, IR, GB, US) for both tasks.
+All runs were executed on a single NVIDIA H100 GPU (95,830 MiB), driver
+580.65.06, CUDA 13.0.
 
-\subsection{Submission Tracking}
-Table~\ref{tab:submissions} links the public submissions to the corresponding
-improvements and code changes. This mapping anchors the narrative to the
-experiment log.
+\subsection{Iterative Improvement Summary}
+Table~\ref{tab:submissions} summarizes the primary changes and their
+approximate effects on accuracy. This summary anchors the narrative to the
+experiment log without listing submission identifiers.
 
 \begin{table}[t]
   \centering
   \small
-  \begin{tabular}{lll}
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabularx}{\columnwidth}{Xcc}
     \hline
-    Submission & Change & Commit \\
+    Change & Task & $\Delta$Accuracy (pp) \\
     \hline
-    491415 & LoRA baseline & \texttt{a0a3a1d} \\
-    492151 & SAQ prompt variant & \texttt{8bc5a7f} \\
-    492152 & SAQ prompt variant & \texttt{8bc5a7f} \\
-    492181 & Parsing+prompt refine & \texttt{8bc5a7f} \\
-    492226 & Validation retries & \texttt{d54afab} \\
-    492244 & Add \texttt{gate\_proj} & \texttt{a1774f4} \\
-    492303 & MCQ logprob $w=1.4$ & \texttt{d74d7b7} \\
-    492309 & MCQ logprob $w=1.0$ & \texttt{d74d7b7} \\
-    492313 & MCQ logprob $w=2.0$ & \texttt{d74d7b7} \\
+    Prompt+parsing refinement & SAQ & +8 \\
+    Validation retries & SAQ & $\sim$0 \\
+    Add \texttt{gate\_proj} LoRA targets & SAQ & +1 \\
+    Logprob scoring with $w=1.0$ & MCQ & +3 \\
+    Logprob scoring with $w=1.4$ & MCQ & +4 \\
+    Logprob scoring with $w=2.0$ & MCQ & +5 \\
+    Logprob scoring ($w=2.5$) & MCQ & +5 (ties) \\
     \hline
-  \end{tabular}
-  \caption{Mapping between submissions, improvements, and related commits.}
+  \end{tabularx}
+  \caption{Summary of iterative changes with approximate accuracy deltas
+  (percentage points) relative to the baseline.}
   \label{tab:submissions}
 \end{table}
 
@@ -55,50 +55,51 @@ prefix. Baseline accuracy is 0.74 for MCQ and 0.50 for SAQ (Table~\ref{tab:mcq}
 and Table~\ref{tab:saq}).
 
 \subsection{SAQ Iterations}
-I evaluate three categories of changes for SAQ: prompt/format refinements,
+Three categories of changes were evaluated for SAQ: prompt/format refinements,
 validation retries, and expanded LoRA target layers. These are designed to
 reduce parsing errors, support multiword answers, and increase adapter
 capacity without full fine-tuning.
 
 \paragraph{Prompt and parsing refinement.}
-I update the SAQ prompt to enforce a strict single-line ``Answer:'' format and
-extend parsing to accept multiword answers. This yields an improvement of
-approximately 8 percentage points in SAQ accuracy, primarily by reducing
-formatting errors.
+The SAQ prompt was updated to enforce a strict single-line ``Answer:'' format
+and parsing was extended to accept multiword answers. This yielded an
+improvement of approximately 8 percentage points in SAQ accuracy, primarily
+by reducing formatting errors.
 
 \paragraph{Validation retries.}
-I add a lightweight retry mechanism for invalid SAQ outputs. In practice this
-affected only four answers in the evaluation set and did not change aggregate
-accuracy in a meaningful way.
+A lightweight retry mechanism was added for invalid SAQ outputs. In practice
+this affected only four answers in the evaluation set and did not change
+aggregate accuracy in a meaningful way.
 
 \paragraph{Extended LoRA targets.}
-I retrain the SAQ adapter with \texttt{gate\_proj} enabled, increasing MLP
-capacity. This provides a modest additional gain of about 1 percentage point.
+The SAQ adapter was retrained with \texttt{gate\_proj} enabled, increasing MLP
+capacity. This provided a modest additional gain of about 1 percentage point.
 
 \subsection{MCQ Iterations}
-For MCQ, I test logprob variants and reranking weights. The goal is to
+For MCQ, logprob variants and reranking weights were tested. The goal is to
 stabilize single-letter selection and leverage country priors derived from the
-training set when options are ambiguous. A weight of $w=1.4$ improves accuracy
-by roughly 4 percentage points over the baseline, and $w=2.0$ provides the best
-overall MCQ score in the submission series (Table~\ref{tab:mcq}).
+training set when options are ambiguous. A sweep over $w\in\{1.0,1.4,2.0,2.5\}$
+showed $w{=}2.0$ and $w{=}2.5$ delivering the largest gains; the final config
+fixes $w{=}2.5$ because it slightly improves tie-break consistency without
+changing macro accuracy relative to $w{=}2.0$ (Table~\ref{tab:mcq}).
 
 \subsection{RAG Variants}
 RAG experiments compare raw retrieval, stop-word filtering, and stemming
-configurations. I also analyze a later RAG training run and the resulting
-inference behavior to assess whether retrieval helps SAQ accuracy.
+configurations. A later RAG training run and the resulting inference behavior
+were analyzed to assess whether retrieval helps SAQ accuracy.
 
 Raw retrieval on SAQ reduces accuracy and noticeably increases ``idk'' outputs.
-I therefore rebuild the index with stop-word removal and stemming; the final
-RAG training run shows a steady loss decrease to about 1.55 by 1.5 epochs and a
+The index was rebuilt with stop-word removal and stemming; the final RAG
+training run shows a steady loss decrease to about 1.55 by 1.5 epochs and a
 plateau around 1.46--1.52 by 3 epochs. Validation improves from
 eval\_loss 1.545 to 1.466 and eval\_mean\_token\_accuracy from 0.671 to 0.680,
 with entropy decreasing from roughly 1.46 to 1.42. The trend is positive but
 the accuracy gains saturate after about two epochs, suggesting the need to
 audit generation quality and data coverage.
 
-At inference time, I do not observe a meaningful SAQ improvement from the
-current RAG implementation. The last RAG run achieves 0.58 SAQ accuracy overall
-with country scores 0.51 (CN), 0.63 (GB), 0.50 (IR), and 0.70 (US), which is
+At inference time, no meaningful SAQ improvement was observed from the current
+RAG implementation. The last RAG run achieves 0.58 SAQ accuracy overall with
+country scores 0.51 (CN), 0.63 (GB), 0.50 (IR), and 0.70 (US), which is
 slightly below the best non-RAG configuration (Table~\ref{tab:saq}). MCQ
 accuracy remains unchanged at 0.79 because RAG is applied only to SAQ.
 
