@@ -3,7 +3,7 @@
 
 import argparse
 import json
-import gc
+import re
 from pathlib import Path
 
 from tqdm import tqdm
@@ -11,9 +11,78 @@ from rank_bm25 import BM25Okapi
 import pickle
 
 
+# Common English stop words to filter out
+STOP_WORDS = frozenset([
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "must", "shall", "can", "need", "dare",
+    "ought", "used", "to", "of", "in", "for", "on", "with", "at", "by",
+    "from", "as", "into", "through", "during", "before", "after", "above",
+    "below", "between", "under", "again", "further", "then", "once",
+    "here", "there", "when", "where", "why", "how", "all", "each", "few",
+    "more", "most", "other", "some", "such", "no", "nor", "not", "only",
+    "own", "same", "so", "than", "too", "very", "just", "also", "now",
+    "and", "but", "if", "or", "because", "until", "while", "although",
+    "this", "that", "these", "those", "what", "which", "who", "whom",
+    "whose", "it", "its", "he", "she", "they", "them", "his", "her",
+    "their", "i", "you", "we", "my", "your", "our", "me", "him", "us",
+])
+
+
+class PorterStemmer:
+    """Lightweight Porter Stemmer."""
+
+    def __init__(self):
+        self.vowels = frozenset("aeiou")
+
+    def _m(self, s):
+        return "".join("V" if c in self.vowels else "C" for c in s).count("VC")
+
+    def _has_vowel(self, s):
+        return any(c in self.vowels for c in s)
+
+    def _double_c(self, w):
+        return len(w) >= 2 and w[-1] == w[-2] and w[-1] not in self.vowels
+
+    def _cvc(self, w):
+        return len(w) >= 3 and w[-3] not in self.vowels and w[-2] in self.vowels and w[-1] not in self.vowels and w[-1] not in "wxy"
+
+    def stem(self, w):
+        if len(w) <= 2:
+            return w
+        if w.endswith("sses"): w = w[:-2]
+        elif w.endswith("ies"): w = w[:-2]
+        elif w.endswith("s") and not w.endswith("ss"): w = w[:-1]
+        if w.endswith("eed") and self._m(w[:-3]) > 0: w = w[:-1]
+        elif w.endswith("ed") and self._has_vowel(w[:-2]): w = w[:-2]
+        elif w.endswith("ing") and self._has_vowel(w[:-3]): w = w[:-3]
+        if w.endswith("y") and self._has_vowel(w[:-1]): w = w[:-1] + "i"
+        for suf, rep in [("ational","ate"),("tional","tion"),("enci","ence"),("anci","ance"),("izer","ize"),("ization","ize"),("ation","ate"),("ator","ate"),("fulness","ful"),("ousness","ous"),("iveness","ive")]:
+            if w.endswith(suf) and self._m(w[:-len(suf)]) > 0:
+                w = w[:-len(suf)] + rep
+                break
+        for suf, rep in [("icate","ic"),("ative",""),("alize","al"),("ical","ic"),("ful",""),("ness","")]:
+            if w.endswith(suf) and self._m(w[:-len(suf)]) > 0:
+                w = w[:-len(suf)] + rep
+                break
+        for suf in ["al","ance","ence","er","ic","able","ible","ant","ement","ment","ent","ou","ism","ate","iti","ous","ive","ize"]:
+            if w.endswith(suf) and self._m(w[:-len(suf)]) > 1:
+                w = w[:-len(suf)]
+                break
+        if w.endswith("ion") and len(w) > 3 and w[-4] in "st" and self._m(w[:-3]) > 1: w = w[:-3]
+        if w.endswith("e") and (self._m(w[:-1]) > 1 or (self._m(w[:-1]) == 1 and not self._cvc(w[:-1]))): w = w[:-1]
+        if self._m(w) > 1 and self._double_c(w) and w[-1] == "l": w = w[:-1]
+        return w
+
+
+_stemmer = PorterStemmer()
+
+
 def tokenize(text: str) -> list[str]:
-    """Simple whitespace tokenization with lowercasing."""
-    return text.lower().split()
+    """Tokenize with lowercasing, stop word removal, and stemming."""
+    text = re.sub(r'[^\w\s]', ' ', text.lower())
+    tokens = text.split()
+    return [_stemmer.stem(t) for t in tokens if t not in STOP_WORDS and len(t) > 1]
 
 
 def build_index(

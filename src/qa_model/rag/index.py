@@ -3,10 +3,145 @@
 import hashlib
 import json
 import pickle
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from rank_bm25 import BM25Okapi
+
+
+class PorterStemmer:
+    """Lightweight Porter Stemmer implementation."""
+
+    def __init__(self):
+        self.vowels = frozenset("aeiou")
+
+    def _measure(self, stem: str) -> int:
+        """Calculate the measure of a stem (number of VC patterns)."""
+        cv = ""
+        for char in stem:
+            if char in self.vowels:
+                cv += "V"
+            else:
+                cv += "C"
+        return cv.count("VC")
+
+    def _has_vowel(self, stem: str) -> bool:
+        return any(c in self.vowels for c in stem)
+
+    def _ends_double_consonant(self, word: str) -> bool:
+        return len(word) >= 2 and word[-1] == word[-2] and word[-1] not in self.vowels
+
+    def _ends_cvc(self, word: str) -> bool:
+        if len(word) < 3:
+            return False
+        return (word[-3] not in self.vowels and
+                word[-2] in self.vowels and
+                word[-1] not in self.vowels and
+                word[-1] not in "wxy")
+
+    def stem(self, word: str) -> str:
+        """Apply Porter stemming to a word."""
+        if len(word) <= 2:
+            return word
+
+        # Step 1a
+        if word.endswith("sses"):
+            word = word[:-2]
+        elif word.endswith("ies"):
+            word = word[:-2]
+        elif word.endswith("ss"):
+            pass
+        elif word.endswith("s"):
+            word = word[:-1]
+
+        # Step 1b
+        if word.endswith("eed"):
+            if self._measure(word[:-3]) > 0:
+                word = word[:-1]
+        elif word.endswith("ed"):
+            stem = word[:-2]
+            if self._has_vowel(stem):
+                word = stem
+                if word.endswith(("at", "bl", "iz")):
+                    word += "e"
+                elif self._ends_double_consonant(word) and word[-1] not in "lsz":
+                    word = word[:-1]
+                elif self._measure(word) == 1 and self._ends_cvc(word):
+                    word += "e"
+        elif word.endswith("ing"):
+            stem = word[:-3]
+            if self._has_vowel(stem):
+                word = stem
+                if word.endswith(("at", "bl", "iz")):
+                    word += "e"
+                elif self._ends_double_consonant(word) and word[-1] not in "lsz":
+                    word = word[:-1]
+                elif self._measure(word) == 1 and self._ends_cvc(word):
+                    word += "e"
+
+        # Step 1c
+        if word.endswith("y") and self._has_vowel(word[:-1]):
+            word = word[:-1] + "i"
+
+        # Step 2
+        step2_suffixes = {
+            "ational": "ate", "tional": "tion", "enci": "ence", "anci": "ance",
+            "izer": "ize", "abli": "able", "alli": "al", "entli": "ent",
+            "eli": "e", "ousli": "ous", "ization": "ize", "ation": "ate",
+            "ator": "ate", "alism": "al", "iveness": "ive", "fulness": "ful",
+            "ousness": "ous", "aliti": "al", "iviti": "ive", "biliti": "ble",
+        }
+        for suffix, replacement in step2_suffixes.items():
+            if word.endswith(suffix):
+                stem = word[:-len(suffix)]
+                if self._measure(stem) > 0:
+                    word = stem + replacement
+                break
+
+        # Step 3
+        step3_suffixes = {
+            "icate": "ic", "ative": "", "alize": "al",
+            "iciti": "ic", "ical": "ic", "ful": "", "ness": "",
+        }
+        for suffix, replacement in step3_suffixes.items():
+            if word.endswith(suffix):
+                stem = word[:-len(suffix)]
+                if self._measure(stem) > 0:
+                    word = stem + replacement
+                break
+
+        # Step 4
+        step4_suffixes = [
+            "al", "ance", "ence", "er", "ic", "able", "ible", "ant",
+            "ement", "ment", "ent", "ion", "ou", "ism", "ate", "iti",
+            "ous", "ive", "ize",
+        ]
+        for suffix in step4_suffixes:
+            if word.endswith(suffix):
+                stem = word[:-len(suffix)]
+                if self._measure(stem) > 1:
+                    if suffix == "ion" and stem and stem[-1] in "st":
+                        word = stem
+                    elif suffix != "ion":
+                        word = stem
+                break
+
+        # Step 5a
+        if word.endswith("e"):
+            stem = word[:-1]
+            if self._measure(stem) > 1 or (self._measure(stem) == 1 and not self._ends_cvc(stem)):
+                word = stem
+
+        # Step 5b
+        if self._measure(word) > 1 and self._ends_double_consonant(word) and word.endswith("l"):
+            word = word[:-1]
+
+        return word
+
+
+# Global stemmer instance
+_stemmer = PorterStemmer()
 
 
 class WikipediaIndex:
@@ -51,9 +186,12 @@ class WikipediaIndex:
 
     @classmethod
     def _tokenize(cls, text: str) -> List[str]:
-        """Tokenize text with lowercasing and stop word removal."""
-        tokens = text.lower().split()
-        return [t for t in tokens if t not in cls.STOP_WORDS and len(t) > 1]
+        """Tokenize text with lowercasing, stop word removal, and stemming."""
+        # Remove punctuation and split
+        text = re.sub(r'[^\w\s]', ' ', text.lower())
+        tokens = text.split()
+        # Filter stop words, short tokens, and apply stemming
+        return [_stemmer.stem(t) for t in tokens if t not in cls.STOP_WORDS and len(t) > 1]
 
     @classmethod
     def from_corpus(

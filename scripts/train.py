@@ -22,6 +22,7 @@ from qa_model.training.callbacks import (
     log_lora_params,
     MLflowSystemMetricsCallback,
 )
+from qa_model.rag import create_retriever
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
@@ -89,20 +90,58 @@ def main(cfg: DictConfig) -> None:
     )
     print(f"Model loaded: {bundle.model_id}")
 
+    # Initialize RAG retriever for SAQ training (if enabled)
+    retriever = None
+    rag_cfg = cfg.get("rag", {})
+    if task == "saq" and rag_cfg.get("enabled", False):
+        print("\n[3/6] Initializing RAG for training...")
+        try:
+            retriever = create_retriever(rag_cfg)
+            if retriever:
+                print(f"RAG enabled for training: {rag_cfg.retriever.type} retriever")
+                print(f"  - Index: {rag_cfg.index.dir}")
+                print(f"  - Top-k: {rag_cfg.top_k}")
+                print(f"  - Max context tokens: {rag_cfg.max_context_tokens}")
+        except FileNotFoundError as e:
+            print(f"WARNING: RAG index not found ({e}). Training without RAG.")
+            retriever = None
+        except Exception as e:
+            print(f"WARNING: Failed to initialize RAG ({e}). Training without RAG.")
+            retriever = None
+    else:
+        if task == "saq":
+            print("\n[3/6] RAG disabled for training")
+
     # Create datasets
-    print("\n[3/5] Preparing datasets...")
+    step = "[4/6]" if task == "saq" else "[3/5]"
+    print(f"\n{step} Preparing datasets...")
     if task == "mcq":
         train_dataset = MCQDataset(train_df, bundle.tokenizer, training_cfg.max_seq_length).to_hf_dataset()
         val_dataset = MCQDataset(val_df, bundle.tokenizer, training_cfg.max_seq_length).to_hf_dataset()
     else:
-        train_dataset = SAQDataset(train_df, bundle.tokenizer, training_cfg.max_seq_length).to_hf_dataset()
-        val_dataset = SAQDataset(val_df, bundle.tokenizer, training_cfg.max_seq_length).to_hf_dataset()
+        train_dataset = SAQDataset(
+            train_df,
+            bundle.tokenizer,
+            training_cfg.max_seq_length,
+            retriever=retriever,
+            rag_top_k=int(rag_cfg.get("top_k", 3)),
+            rag_max_tokens=int(rag_cfg.get("max_context_tokens", 512)),
+        ).to_hf_dataset()
+        val_dataset = SAQDataset(
+            val_df,
+            bundle.tokenizer,
+            training_cfg.max_seq_length,
+            retriever=retriever,
+            rag_top_k=int(rag_cfg.get("top_k", 3)),
+            rag_max_tokens=int(rag_cfg.get("max_context_tokens", 512)),
+        ).to_hf_dataset()
 
     print(f"Train dataset size: {len(train_dataset)}")
     print(f"Val dataset size: {len(val_dataset)}")
 
     # Apply LoRA
-    print("\n[4/5] Applying LoRA adapter...")
+    step = "[5/6]" if task == "saq" else "[4/5]"
+    print(f"\n{step} Applying LoRA adapter...")
     lora_config = create_lora_config(
         r=cfg.lora.r,
         alpha=cfg.lora.alpha,
@@ -130,6 +169,17 @@ def main(cfg: DictConfig) -> None:
             "warmup_ratio": training_cfg.warmup_ratio,
             "scheduler": training_cfg.scheduler,
         })
+
+        # Log RAG parameters if enabled
+        if retriever is not None:
+            log_params_to_mlflow({
+                "rag_enabled": True,
+                "rag_top_k": rag_cfg.get("top_k", 3),
+                "rag_max_context_tokens": rag_cfg.get("max_context_tokens", 512),
+                "rag_retriever_type": rag_cfg.retriever.get("type", "bm25"),
+            })
+        else:
+            log_params_to_mlflow({"rag_enabled": False})
 
     # Create training arguments
     adapter_name = f"adapter_{task}"
@@ -160,7 +210,8 @@ def main(cfg: DictConfig) -> None:
         ))
 
     # Train
-    print("\n[5/5] Training...")
+    step = "[6/6]" if task == "saq" else "[5/5]"
+    print(f"\n{step} Training...")
     trainer = train_adapter(
         model=model_with_lora,
         tokenizer=bundle.tokenizer,

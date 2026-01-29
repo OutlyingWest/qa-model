@@ -38,11 +38,15 @@ Rules:
 - <ANSWER> can be 1–6 tokens (words/numbers/time).
 - No explanation, no second line, no trailing period.
 - Follow any requested numeric/time format exactly (HH:MM, Arabic numerals, 1~12, etc.).
-- Check the context and try to find the answer to your question in it. If you can't, use your general knowledge to answer the question. 
+- Check the Context section and try to find the answer to your question in it.
+- If there is no clear answer to your question in the Context, you must ignore it and use your general knowledge to answer the question. 
 - In any case answer directly without referencing the context.
 
-If unsure:
-Answer: idk"""
+If and only if BOTH:
+    1. You have not found an answer to the given question in Context section.
+    2. You are not able to provide the answer from your general knowledge.
+Then:
+    Answer: idk"""
 
 
 MCQ_SYSTEM_PROMPT = """Answer the multiple choice question.

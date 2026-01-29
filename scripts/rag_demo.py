@@ -59,7 +59,7 @@ def demo_rag_pipeline(
     print(f"\nFound {len(documents)} documents:")
     for i, doc in enumerate(documents, 1):
         title = doc.get("title", "N/A")
-        text_preview = doc.get("text", "")[:200] + "..."
+        text_preview = doc.get("text", "")[:350] + "..."
         print(f"\n  [{i}] {title}")
         print(f"      {text_preview}")
 
