@@ -1,8 +1,27 @@
 \section{Results}
 \label{sec:results}
-This section reports MCQ and SAQ accuracy overall and by country and compares
-the baseline with the best combined configuration (without RAG). All numbers
-match the official experiment log in \texttt{report/drafts/experiments.md}.
+
+We evaluate performance on MCQ and SAQ tasks both overall and by country,
+comparing the baseline model with the best combined configuration (without RAG).
+
+\paragraph{MCQ Performance.}
+The best combined configuration increases overall MCQ accuracy from 0.74 to 0.79
+(+0.05 absolute). The largest improvements are observed for CN (+0.08) and IR
+(+0.06), while gains for US are moderate (+0.04) and minimal for GB (+0.01).
+
+\paragraph{SAQ Performance.}
+For SAQ, overall accuracy rises from 0.50 to 0.59 (+0.09). The largest increase
+is observed for CN (+0.17), followed by US (+0.07). GB (+0.07) and IR (+0.05)
+show smaller but consistent improvements.
+
+\paragraph{RAG Configuration.}
+The final RAG-based run achieves 0.58 overall SAQ accuracy, with country-level
+scores of 0.51 (CN), 0.63 (GB), 0.50 (IR), and 0.70 (US). This is slightly below
+the best non-RAG configuration. MCQ accuracy remains unchanged at 0.79, as RAG
+is applied only to SAQ.
+
+Overall, the combined configuration yields consistent gains across most countries,
+with particularly strong improvements on SAQ for CN and US.
 
 \begin{table}[t]
   \centering
@@ -11,9 +30,9 @@ match the official experiment log in \texttt{report/drafts/experiments.md}.
     \textbf{MCQ} & \textbf{Baseline} & \textbf{Best} \\
     \hline
     Overall & 0.74 & 0.79 \\
-    China & 0.66 & 0.74 \\
+    CN & 0.66 & 0.74 \\
     Iran & 0.62 & 0.68 \\
-    UK & 0.90 & 0.91 \\
+    GB & 0.90 & 0.91 \\
     US & 0.80 & 0.84 \\
     \hline
   \end{tabular}

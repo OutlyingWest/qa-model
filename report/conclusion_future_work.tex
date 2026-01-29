@@ -1,12 +1,12 @@
 \section{Conclusion and Future Work}
-I present a LoRA-based QA pipeline for MCQ and SAQ with strict format control,
-log-probability scoring for MCQ, and an optional BM25-based RAG component for
-SAQ. Across the iteration cycle, the largest SAQ gains come from prompt and
-parsing refinements, with a smaller contribution from expanding LoRA targets to
-include \texttt{gate\_proj}. For MCQ, logprob scoring with tuned weighting
-improves accuracy over the baseline. The best combined configuration reaches
-0.79 MCQ accuracy and 0.59 SAQ accuracy, while the current RAG implementation
-does not yield a measurable SAQ improvement.
+This work presents a LoRA-based QA pipeline for MCQ and SAQ with strict format
+control, log-probability scoring for MCQ, and an optional BM25-based RAG
+component for SAQ. Across the iteration cycle, the largest SAQ gains come from
+prompt and parsing refinements, with a smaller contribution from expanding LoRA
+targets to include \texttt{gate\_proj}. For MCQ, logprob scoring with tuned
+weighting improves accuracy over the baseline. The best combined configuration
+reaches 0.79 MCQ accuracy and 0.59 SAQ accuracy, while the current RAG
+implementation does not yield a measurable SAQ improvement.
 
 Future work should focus on (1) improving retrieval quality with better
 indexing, reranking, or learned retrievers; (2) analyzing generation errors to

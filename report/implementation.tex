@@ -5,29 +5,30 @@ configuration management \citep{Yadan2019Hydra}. The codebase separates
 training and inference scripts for clarity and reproducibility.
 
 \subsection{LoRA Fine-Tuning}
-I apply LoRA adapters \citep{Hu2021LoRA} to the attention projection layers
+LoRA adapters \citep{Hu2021LoRA} are applied to the attention projection layers
 (\texttt{q\_proj}, \texttt{k\_proj}, \texttt{v\_proj}, \texttt{o\_proj}) with
 rank $r=16$, $\alpha=32$, and dropout $0.05$. This keeps the number of trainable
-parameters small while allowing task-specific adaptation. For SAQ, I also test
-an extended configuration that includes \texttt{gate\_proj} to increase MLP
+parameters small while allowing task-specific adaptation. For SAQ, an extended
+configuration that includes \texttt{gate\_proj} is also tested to increase MLP
 capacity.
 
 \subsection{MCQ Inference via Logprob Scoring}
 Instead of generating a full answer, MCQ inference scores each option by the
 log-probability of producing a single-letter continuation. The algorithm
 performs a forward pass on the prompt to obtain the KV cache and the
-distribution for the next token. For each choice in \{A,B,C,D\}, I evaluate
-several textual variants (`` A'', ``\textbackslash nA'', ``A'') and sum
-token-level log-probabilities using the cached states. The best variant score
-is selected for that choice, and the highest-scoring choice is returned.
+distribution for the next token. For each choice in \{A,B,C,D\}, several
+textual variants (`` A'', ``\textbackslash nA'', ``A'') are evaluated and
+token-level log-probabilities are summed using the cached states. The best
+variant score is selected for that choice, and the highest-scoring choice is
+returned.
 
-I optionally add a lightweight country-aware prior derived from the MCQ
+An optional lightweight country-aware prior is added derived from the MCQ
 training data. The prior is computed as a smoothed log-probability of the
 target country tag conditioned on the option text, and scaled by a tunable
 weight during inference.
 
 \subsection{RAG for SAQ}
-For SAQ, I integrate a retrieval-augmented generation path
+For SAQ, a retrieval-augmented generation path is integrated
 \citep{Lewis2020RAG}. The retriever builds a Wikipedia-based index using
 BM25 \citep{Robertson2009BM25} over tokenized document text. Tokenization
 lowercases, strips punctuation, removes stop words, and applies a lightweight
