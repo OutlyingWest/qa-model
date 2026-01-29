@@ -1,6 +1,39 @@
 \section{Results}
 \label{sec:results}
-This section reports MCQ and SAQ accuracy overall and by country. It also
-compares the baseline with the best combined configuration. Tables are filled
-in Step~4 to match the official metrics in
-\texttt{report/drafts/experiments.md}.
+This section reports MCQ and SAQ accuracy overall and by country and compares
+the baseline with the best combined configuration (without RAG). All numbers
+match the official experiment log in \texttt{report/drafts/experiments.md}.
+
+\begin{table}[t]
+  \centering
+  \begin{tabular}{lcc}
+    \hline
+    \textbf{MCQ} & \textbf{Baseline} & \textbf{Best} \\
+    \hline
+    Overall & 0.74 & 0.79 \\
+    China & 0.66 & 0.74 \\
+    Iran & 0.62 & 0.68 \\
+    UK & 0.90 & 0.91 \\
+    US & 0.80 & 0.84 \\
+    \hline
+  \end{tabular}
+  \caption{MCQ accuracy for the baseline and best combined configuration.}
+  \label{tab:mcq}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \begin{tabular}{lcc}
+    \hline
+    \textbf{SAQ} & \textbf{Baseline} & \textbf{Best} \\
+    \hline
+    Overall & 0.50 & 0.59 \\
+    CN & 0.40 & 0.57 \\
+    GB & 0.59 & 0.66 \\
+    IR & 0.38 & 0.43 \\
+    US & 0.64 & 0.71 \\
+    \hline
+  \end{tabular}
+  \caption{SAQ accuracy for the baseline and best combined configuration.}
+  \label{tab:saq}
+\end{table}
